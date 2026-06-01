@@ -19,7 +19,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           password: ${{ secrets.VPS_PASSWORD }}
-          source: "main.py,requirements.txt,meta-api.service"
+          source: "main.py,requirements.txt,meta-api.service,nginx.conf.template"
           target: "/var/www/meta-api"
 
       - name: Execute remote SSH commands
@@ -50,3 +50,18 @@ jobs:
             systemctl daemon-reload
             systemctl enable meta-api.service
             systemctl restart meta-api.service
+            
+            # Install nginx, certbot, python3-certbot-nginx
+            apt-get update
+            apt-get install -y nginx certbot python3-certbot-nginx
+            
+            # Setup Nginx configuration
+            sed "s/DOMAIN_NAME/${{ secrets.DOMAIN_NAME }}/g" nginx.conf.template > /etc/nginx/sites-available/meta-api
+            ln -sf /etc/nginx/sites-available/meta-api /etc/nginx/sites-enabled/
+            rm -f /etc/nginx/sites-enabled/default
+            
+            # Reload Nginx
+            nginx -t && systemctl reload nginx
+            
+            # Obtain SSL certificate using Certbot
+            certbot --nginx -d ${{ secrets.DOMAIN_NAME }} --non-interactive --agree-tos -m ${{ secrets.EMAIL_FOR_SSL }} --redirect || true
