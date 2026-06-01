@@ -13,23 +13,30 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Copy files via SCP
-        uses: appleboy/scp-action@v0.1.4
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
-          password: ${{ secrets.VPS_PASSWORD }}
-          source: "main.py,requirements.txt,meta-api.service,nginx.conf.template"
-          target: "/var/www/meta-api"
-
-      - name: Execute remote SSH commands
+      - name: Deploy via SSH (Clone & Setup)
         uses: appleboy/ssh-action@v0.1.10
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
-            cd /var/www/meta-api
+            # Install git if missing
+            apt-get update && apt-get install -y git
+            
+            # Resolve absolute path for ~/meta
+            DEPLOY_DIR=$HOME/meta
+            
+            # Clone or pull the repository
+            if [ ! -d "$DEPLOY_DIR/.git" ]; then
+              rm -rf "$DEPLOY_DIR"
+              git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git "$DEPLOY_DIR"
+            else
+              cd "$DEPLOY_DIR"
+              git fetch --all
+              git reset --hard origin/main || git reset --hard origin/master
+            fi
+            
+            cd "$DEPLOY_DIR"
             
             # Create .env file with secrets
             echo "META_ACCESS_TOKEN=${{ secrets.META_ACCESS_TOKEN }}" > .env
@@ -43,8 +50,8 @@ jobs:
             ./venv/bin/pip install --upgrade pip
             ./venv/bin/pip install -r requirements.txt
             
-            # Copy systemd service file
-            cp meta-api.service /etc/systemd/system/meta-api.service
+            # Copy systemd service file with dynamically updated paths
+            sed "s|/var/www/meta|$DEPLOY_DIR|g" meta-api.service > /etc/systemd/system/meta-api.service
             
             # Reload systemd, enable and restart service
             systemctl daemon-reload
@@ -52,7 +59,6 @@ jobs:
             systemctl restart meta-api.service
             
             # Install nginx, certbot, python3-certbot-nginx
-            apt-get update
             apt-get install -y nginx certbot python3-certbot-nginx
             
             # Setup Nginx configuration
