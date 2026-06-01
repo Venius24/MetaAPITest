@@ -1,0 +1,12 @@
+[Unit]
+Description=Meta API Flask Webhook Service
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/var/www/meta-api
+ExecStart=/var/www/meta-api/venv/bin/python main.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
