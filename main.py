@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# Тот самый токен, который ты придумаешь и вставишь в консоли Facebook
+# Тот самый токен, который ты придумаешь и вставишь в консоли
 VERIFY_TOKEN = "my_super_secret_token_123"
 
 @app.route("/webhook", methods=["GET", "POST"])
